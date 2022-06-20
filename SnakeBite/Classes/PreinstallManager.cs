@@ -76,65 +76,71 @@ namespace SnakeBite
                 bool Skip = true;
                 foreach (PreinstallEntry modB in allMods) // [modA -> modA], [modA -> modB], [modA -> modC]
                 {
-                    if (modA.Equals(modB)) { Skip = false; continue; } // skip reflexive compare (i.e. [modA -> modA])
-                    if (Skip) { continue; } // skip previous compares (i.e. [modB -> modA], [modC -> modB], [modC -> modA])
-
-                    if (hasConflict(modA.modInfo, modB.modInfo)) // [modA -> modB], [modA -> modC], [modB -> modC]
+                    if (!CanUpdateModFiles(modA.modInfo, modB.modInfo)) //ZIP: If LibEntries exist, compare them and install the latest version of the file.
                     {
-                        modA.ModConflicts.Add(modB.modInfo.Name);
-                        modB.ModConflicts.Add(modA.modInfo.Name);
-                    }
+                        if (modA.Equals(modB)) { Skip = false; continue; } // skip reflexive compare (i.e. [modA -> modA])
+                        if (Skip) { continue; } // skip previous compares (i.e. [modB -> modA], [modC -> modB], [modC -> modA])
 
+                        if (hasConflict(modA.modInfo, modB.modInfo)) // [modA -> modB], [modA -> modC], [modB -> modC]
+                        {
+                            modA.ModConflicts.Add(modB.modInfo.Name);
+                            modB.ModConflicts.Add(modA.modInfo.Name);
+                        }
+                    }
                 }
             }
         }
 
         public static void GetConflicts(PreinstallEntry addedMod, List<PreinstallEntry> listedMods) // checks each mod against one another for conflicts, and adds conflicting mods to a list.
         {
-
             Debug.LogLine(String.Format("[PreinstallCheck] Checking for conflicts: {0}", addedMod.modInfo.Name), Debug.LogLevel.Basic);
             foreach (PreinstallEntry listedMod in listedMods)
             {
-                if (addedMod.Equals(listedMod) || listedMod.ModConflicts.Contains(addedMod.modInfo.Name)) continue;
-
-                if (hasConflict(addedMod.modInfo, listedMod.modInfo))
+                if (!CanUpdateModFiles(addedMod.modInfo, listedMod.modInfo)) //ZIP: If LibEntries exist, compare them and install the latest version of the file.
                 {
-                    addedMod.ModConflicts.Add(listedMod.modInfo.Name);
-                    listedMod.ModConflicts.Add(addedMod.modInfo.Name);
-                }
+                    if (addedMod.Equals(listedMod) || listedMod.ModConflicts.Contains(addedMod.modInfo.Name)) continue;
 
+                    if (hasConflict(addedMod.modInfo, listedMod.modInfo))
+                    {
+                        addedMod.ModConflicts.Add(listedMod.modInfo.Name);
+                        listedMod.ModConflicts.Add(addedMod.modInfo.Name);
+                    }
+                }
             }
         }
 
         public static bool hasConflict(ModEntry mod1, ModEntry mod2)
         {
-            foreach (ModQarEntry qarEntry in mod1.ModQarEntries) // iterate qar files from new mod
+            if (!CanUpdateModFiles(mod1, mod2)) //ZIP: If LibEntries exist, compare them and install the latest version of the file.
             {
-                if (qarEntry.FilePath.EndsWith(".fpk") || qarEntry.FilePath.EndsWith(".fpkd")) continue;
-                ModQarEntry conflicts = mod2.ModQarEntries.FirstOrDefault(entry => Tools.CompareHashes(entry.FilePath, qarEntry.FilePath));
-                if (conflicts != null)
+                foreach (ModQarEntry qarEntry in mod1.ModQarEntries) // iterate qar files from new mod
                 {
-                    Debug.LogLine(String.Format("[PreinstallCheck] Conflict found between {0} and {1}: {2}", mod1.Name, mod2.Name, conflicts.FilePath), Debug.LogLevel.Basic);
-                    return true;
+                    if (qarEntry.FilePath.EndsWith(".fpk") || qarEntry.FilePath.EndsWith(".fpkd")) continue;
+                    ModQarEntry conflicts = mod2.ModQarEntries.FirstOrDefault(entry => Tools.CompareHashes(entry.FilePath, qarEntry.FilePath));
+                    if (conflicts != null)
+                    {
+                        Debug.LogLine(String.Format("[PreinstallCheck] Conflict found between {0} and {1}: {2}", mod1.Name, mod2.Name, conflicts.FilePath), Debug.LogLevel.Basic);
+                        return true;
+                    }
                 }
-            }
 
-            foreach (ModFpkEntry fpkEntry in mod1.ModFpkEntries) // iterate fpk files from new mod
-            {
-                ModFpkEntry conflicts = mod2.ModFpkEntries.FirstOrDefault(entry => Tools.CompareHashes(entry.FpkFile, fpkEntry.FpkFile) &&
-                                                                                       Tools.CompareHashes(entry.FilePath, fpkEntry.FilePath));
-                if (conflicts != null)
+                foreach (ModFpkEntry fpkEntry in mod1.ModFpkEntries) // iterate fpk files from new mod
                 {
-                    return true;
+                    ModFpkEntry conflicts = mod2.ModFpkEntries.FirstOrDefault(entry => Tools.CompareHashes(entry.FpkFile, fpkEntry.FpkFile) &&
+                                                                                           Tools.CompareHashes(entry.FilePath, fpkEntry.FilePath));
+                    if (conflicts != null)
+                    {
+                        return true;
+                    }
                 }
-            }
 
-            foreach (ModFileEntry fileEntry in mod1.ModFileEntries) // iterate external files from new mod
-            {
-                ModFileEntry conflicts = mod2.ModFileEntries.FirstOrDefault(entry => Tools.CompareHashes(entry.FilePath, fileEntry.FilePath));
-                if (conflicts != null)
+                foreach (ModFileEntry fileEntry in mod1.ModFileEntries) // iterate external files from new mod
                 {
-                    return true;
+                    ModFileEntry conflicts = mod2.ModFileEntries.FirstOrDefault(entry => Tools.CompareHashes(entry.FilePath, fileEntry.FilePath));
+                    if (conflicts != null)
+                    {
+                        return true;
+                    }
                 }
             }
             return false;
@@ -218,41 +224,44 @@ namespace SnakeBite
                 Debug.LogLine(String.Format("[PreinstallCheck] Checking conflicts for {0}", metaData.Name), Debug.LogLevel.Basic);
                 foreach (ModEntry mod in mods) // iterate through installed mods [Morbid: TODO iterate pftxs files as well]
                 {
-                    foreach (ModFileEntry fileEntry in metaData.ModFileEntries) // iterate external files from new mod
+                    if (!CanUpdateModFiles(mod, metaData)) //ZIP: If LibEntries exist, compare them and install the latest version of the file.
                     {
-                        ModFileEntry conflicts = mod.ModFileEntries.FirstOrDefault(entry => Tools.CompareHashes(entry.FilePath, fileEntry.FilePath));
-                        if (conflicts != null)
+                        foreach (ModFileEntry fileEntry in metaData.ModFileEntries) // iterate external files from new mod
                         {
-                            if (confIndex == -1) confIndex = mods.IndexOf(mod);
-                            if (!conflictingMods.Contains(mod.Name)) conflictingMods.Add(mod.Name);
-                            Debug.LogLine(String.Format("[{0}] Conflict in 00.dat: {1}", mod.Name, conflicts.FilePath), Debug.LogLevel.Basic);
-                            confCounter++;
+                            ModFileEntry conflicts = mod.ModFileEntries.FirstOrDefault(entry => Tools.CompareHashes(entry.FilePath, fileEntry.FilePath));
+                            if (conflicts != null)
+                            {
+                                if (confIndex == -1) confIndex = mods.IndexOf(mod);
+                                if (!conflictingMods.Contains(mod.Name)) conflictingMods.Add(mod.Name);
+                                Debug.LogLine(String.Format("[{0}] Conflict in 00.dat: {1}", mod.Name, conflicts.FilePath), Debug.LogLevel.Basic);
+                                confCounter++;
+                            }
                         }
-                    }
 
-                    foreach (ModQarEntry qarEntry in metaData.ModQarEntries) // iterate qar files from new mod
-                    {
-                        if (qarEntry.FilePath.EndsWith(".fpk") || qarEntry.FilePath.EndsWith(".fpkd")) continue;
-                        ModQarEntry conflicts = mod.ModQarEntries.FirstOrDefault(entry => Tools.CompareHashes(entry.FilePath, qarEntry.FilePath));
-                        if (conflicts != null)
+                        foreach (ModQarEntry qarEntry in metaData.ModQarEntries) // iterate qar files from new mod
                         {
-                            if (confIndex == -1) confIndex = mods.IndexOf(mod);
-                            if (!conflictingMods.Contains(mod.Name)) conflictingMods.Add(mod.Name);
-                            Debug.LogLine(String.Format("[{0}] Conflict in 00.dat: {1}", mod.Name, conflicts.FilePath), Debug.LogLevel.Basic);
-                            confCounter++;
+                            if (qarEntry.FilePath.EndsWith(".fpk") || qarEntry.FilePath.EndsWith(".fpkd")) continue;
+                            ModQarEntry conflicts = mod.ModQarEntries.FirstOrDefault(entry => Tools.CompareHashes(entry.FilePath, qarEntry.FilePath));
+                            if (conflicts != null)
+                            {
+                                if (confIndex == -1) confIndex = mods.IndexOf(mod);
+                                if (!conflictingMods.Contains(mod.Name)) conflictingMods.Add(mod.Name);
+                                Debug.LogLine(String.Format("[{0}] Conflict in 00.dat: {1}", mod.Name, conflicts.FilePath), Debug.LogLevel.Basic);
+                                confCounter++;
+                            }
                         }
-                    }
 
-                    foreach (ModFpkEntry fpkEntry in metaData.ModFpkEntries) // iterate fpk files from new mod
-                    {
-                        ModFpkEntry conflicts = mod.ModFpkEntries.FirstOrDefault(entry => Tools.CompareHashes(entry.FpkFile, fpkEntry.FpkFile) &&
-                                                                                               Tools.CompareHashes(entry.FilePath, fpkEntry.FilePath));
-                        if (conflicts != null)
+                        foreach (ModFpkEntry fpkEntry in metaData.ModFpkEntries) // iterate fpk files from new mod
                         {
-                            if (confIndex == -1) confIndex = mods.IndexOf(mod);
-                            if (!conflictingMods.Contains(mod.Name)) conflictingMods.Add(mod.Name);
-                            Debug.LogLine(String.Format("[{0}] Conflict in {2}: {1}", mod.Name, conflicts.FilePath, Path.GetFileName(conflicts.FpkFile)), Debug.LogLevel.Basic);
-                            confCounter++;
+                            ModFpkEntry conflicts = mod.ModFpkEntries.FirstOrDefault(entry => Tools.CompareHashes(entry.FpkFile, fpkEntry.FpkFile) &&
+                                                                                                   Tools.CompareHashes(entry.FilePath, fpkEntry.FilePath));
+                            if (conflicts != null)
+                            {
+                                if (confIndex == -1) confIndex = mods.IndexOf(mod);
+                                if (!conflictingMods.Contains(mod.Name)) conflictingMods.Add(mod.Name);
+                                Debug.LogLine(String.Format("[{0}] Conflict in {2}: {1}", mod.Name, conflicts.FilePath, Path.GetFileName(conflicts.FpkFile)), Debug.LogLevel.Basic);
+                                confCounter++;
+                            }
                         }
                     }
                 }
@@ -366,41 +375,44 @@ namespace SnakeBite
             int confIndex = -1;
             foreach (ModEntry mod in mods) // iterate through installed mods
             {
-                foreach (ModFileEntry fileEntry in metaData.ModFileEntries) // iterate external files from new mod
+                if (!CanUpdateModFiles(mod, metaData)) //ZIP: If LibEntries exist, compare them and install the latest version of the file.
                 {
-                    ModFileEntry conflicts = mod.ModFileEntries.FirstOrDefault(entry => Tools.CompareHashes(entry.FilePath, fileEntry.FilePath));
-                    if (conflicts != null)
+                    foreach (ModFileEntry fileEntry in metaData.ModFileEntries) // iterate external files from new mod
                     {
-                        if (confIndex == -1) confIndex = mods.IndexOf(mod);
-                        if (!conflictingMods.Contains(mod.Name)) conflictingMods.Add(mod.Name);
-                        Debug.LogLine(String.Format("[{0}] Conflict in 00.dat: {1}", mod.Name, conflicts.FilePath), Debug.LogLevel.Basic);
-                        confCounter++;
+                        ModFileEntry conflicts = mod.ModFileEntries.FirstOrDefault(entry => Tools.CompareHashes(entry.FilePath, fileEntry.FilePath));
+                        if (conflicts != null)
+                        {
+                            if (confIndex == -1) confIndex = mods.IndexOf(mod);
+                            if (!conflictingMods.Contains(mod.Name)) conflictingMods.Add(mod.Name);
+                            Debug.LogLine(String.Format("[{0}] Conflict in 00.dat: {1}", mod.Name, conflicts.FilePath), Debug.LogLevel.Basic);
+                            confCounter++;
+                        }
                     }
-                }
 
-                foreach (ModQarEntry qarEntry in metaData.ModQarEntries) // iterate qar files from new mod
-                {
-                    if (qarEntry.FilePath.EndsWith(".fpk") || qarEntry.FilePath.EndsWith(".fpkd")) continue;
-                    ModQarEntry conflicts = mod.ModQarEntries.FirstOrDefault(entry => Tools.CompareHashes(entry.FilePath, qarEntry.FilePath));
-                    if (conflicts != null)
+                    foreach (ModQarEntry qarEntry in metaData.ModQarEntries) // iterate qar files from new mod
                     {
-                        if (confIndex == -1) confIndex = mods.IndexOf(mod);
-                        if (!conflictingMods.Contains(mod.Name)) conflictingMods.Add(mod.Name);
-                        Debug.LogLine(String.Format("[{0}] Conflict in 00.dat: {1}", mod.Name, conflicts.FilePath), Debug.LogLevel.Basic);
-                        confCounter++;
+                        if (qarEntry.FilePath.EndsWith(".fpk") || qarEntry.FilePath.EndsWith(".fpkd")) continue;
+                        ModQarEntry conflicts = mod.ModQarEntries.FirstOrDefault(entry => Tools.CompareHashes(entry.FilePath, qarEntry.FilePath));
+                        if (conflicts != null)
+                        {
+                            if (confIndex == -1) confIndex = mods.IndexOf(mod);
+                            if (!conflictingMods.Contains(mod.Name)) conflictingMods.Add(mod.Name);
+                            Debug.LogLine(String.Format("[{0}] Conflict in 00.dat: {1}", mod.Name, conflicts.FilePath), Debug.LogLevel.Basic);
+                            confCounter++;
+                        }
                     }
-                }
 
-                foreach (ModFpkEntry fpkEntry in metaData.ModFpkEntries) // iterate fpk files from new mod
-                {
-                    ModFpkEntry conflicts = mod.ModFpkEntries.FirstOrDefault(entry => Tools.CompareHashes(entry.FpkFile, fpkEntry.FpkFile) &&
-                                                                                           Tools.CompareHashes(entry.FilePath, fpkEntry.FilePath));
-                    if (conflicts != null)
+                    foreach (ModFpkEntry fpkEntry in metaData.ModFpkEntries) // iterate fpk files from new mod
                     {
-                        if (confIndex == -1) confIndex = mods.IndexOf(mod);
-                        if (!conflictingMods.Contains(mod.Name)) conflictingMods.Add(mod.Name);
-                        Debug.LogLine(String.Format("[{0}] Conflict in {2}: {1}", mod.Name, conflicts.FilePath, Path.GetFileName(conflicts.FpkFile)), Debug.LogLevel.Basic);
-                        confCounter++;
+                        ModFpkEntry conflicts = mod.ModFpkEntries.FirstOrDefault(entry => Tools.CompareHashes(entry.FpkFile, fpkEntry.FpkFile) &&
+                                                                                               Tools.CompareHashes(entry.FilePath, fpkEntry.FilePath));
+                        if (conflicts != null)
+                        {
+                            if (confIndex == -1) confIndex = mods.IndexOf(mod);
+                            if (!conflictingMods.Contains(mod.Name)) conflictingMods.Add(mod.Name);
+                            Debug.LogLine(String.Format("[{0}] Conflict in {2}: {1}", mod.Name, conflicts.FilePath, Path.GetFileName(conflicts.FpkFile)), Debug.LogLevel.Basic);
+                            confCounter++;
+                        }
                     }
                 }
             }
@@ -444,6 +456,25 @@ namespace SnakeBite
                 return false;
             }
             return true;
+        }
+
+        //ZIP: Files that have LibEntries automatically overwrite, so long as they have the highest version number.
+        public static bool CanUpdateModFiles(ModEntry currentMod, ModEntry newMod)
+        {
+            if (newMod.ModLibEntries.Count > 0 && currentMod.ModLibEntries.Count > 0)
+            {
+                foreach (ModLibEntry newEntry in newMod.ModLibEntries)
+                {
+                    foreach (ModLibEntry oldEntry in currentMod.ModLibEntries)
+                    {
+                        if (newEntry.FilePath == oldEntry.FilePath)
+                        {
+                            return true;
+                        }
+                    }
+                }
+            }
+            return false;
         }
     }
     public class PreinstallEntry

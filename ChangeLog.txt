@@ -1,4 +1,8 @@
 Changelog:
+0.9.2.2
+SnakeBite/MakeBite:
+Improved file conflict handling.
+
 0.9.2.1
 SnakeBite:
 Hotfix custom WMV support.

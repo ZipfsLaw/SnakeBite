@@ -139,7 +139,7 @@ namespace SnakeBite
             //theoretically there should be no qar overlap between the _gamefpk(vanilla) and _working0(modded) files
             FastZip unzipper = new FastZip();
             GameData gameData = manager.GetGameData();
-
+            List<ModLibEntry> fileVersions = new List<ModLibEntry>();
             bool isAddingWMV = false; //ZIP: WMV Support
             foreach (string modFilePath in modFilePaths) 
             {
@@ -150,23 +150,65 @@ namespace SnakeBite
 
                 Debug.LogLine("[Install] Load mod metadata", Debug.LogLevel.Basic);
                 ModEntry extractedModEntry = new ModEntry("_extr\\metadata.xml");
+                List<string> oldFiles = new List<string>();
                 if (pathUpdatesExist[extractedModEntry.Name])
                 {
+                    //ZIP: Keep track of file version numbers.
+                    Debug.LogLine(string.Format("[Install] Checking file versions: {0}", extractedModEntry.Name), Debug.LogLevel.Basic);
+                    foreach (ModLibEntry fileVersion in extractedModEntry.ModLibEntries)
+                    {
+                        if (fileVersions.Count > 0)
+                        {
+                            List<ModLibEntry> newFileVersions = new List<ModLibEntry>();
+                            foreach (ModLibEntry currentVersion in fileVersions)
+                            {
+                                if (currentVersion.FilePath == fileVersion.FilePath)
+                                {
+                                    if (currentVersion.Version > fileVersion.Version)
+                                    {
+                                        newFileVersions.Add(currentVersion);
+                                    }
+                                    else
+                                    {
+                                        oldFiles.Add(currentVersion.FilePath);
+                                    }
+                                }
+                            }
+                            fileVersions = newFileVersions;
+                        }
+                        else
+                        {
+                            fileVersions.Add(fileVersion);
+                        }
+                    }
+
                     Debug.LogLine(string.Format("[Install] Checking for Qar path updates: {0}", extractedModEntry.Name), Debug.LogLevel.Basic);
                     foreach (ModQarEntry modQar in extractedModEntry.ModQarEntries.Where(entry => !entry.FilePath.StartsWith("/Assets/")))
                     {
-                        string unhashedName = HashingExtended.UpdateName(modQar.FilePath);
-                        if (unhashedName != null)
+                        bool skipFile = false;
+                        if (oldFiles.Count > 0)
                         {
-                            Debug.LogLine(string.Format("[Install] Update successful: {0} -> {1}", modQar.FilePath, unhashedName), Debug.LogLevel.Basic);
+                            foreach (string oldFile in oldFiles)
+                            {
+                                if (oldFile == modQar.FilePath)
+                                    skipFile = true;
+                            }
+                        }
 
-                            string workingOldPath = Path.Combine("_extr", Tools.ToWinPath(modQar.FilePath));
-                            string workingNewPath = Path.Combine("_extr", Tools.ToWinPath(unhashedName));
-                            if (!Directory.Exists(Path.GetDirectoryName(workingNewPath))) Directory.CreateDirectory(Path.GetDirectoryName(workingNewPath));
-                            if (!File.Exists(workingNewPath)) File.Move(workingOldPath, workingNewPath);
+                        if (!skipFile)
+                        {
+                            string unhashedName = HashingExtended.UpdateName(modQar.FilePath);
+                            if (unhashedName != null)
+                            {
+                                Debug.LogLine(string.Format("[Install] Update successful: {0} -> {1}", modQar.FilePath, unhashedName), Debug.LogLevel.Basic);
 
-                            modQar.FilePath = unhashedName;
+                                string workingOldPath = Path.Combine("_extr", Tools.ToWinPath(modQar.FilePath));
+                                string workingNewPath = Path.Combine("_extr", Tools.ToWinPath(unhashedName));
+                                if (!Directory.Exists(Path.GetDirectoryName(workingNewPath))) Directory.CreateDirectory(Path.GetDirectoryName(workingNewPath));
+                                if (!File.Exists(workingNewPath)) File.Move(workingOldPath, workingNewPath);
 
+                                modQar.FilePath = unhashedName;
+                            }
                         }
                     }
                 }
@@ -182,7 +224,7 @@ namespace SnakeBite
                 InstallLooseFtexs(extractedModEntry, ref oneFilesList);
 
                 Debug.LogLine("[Install] Copying game dir files", Debug.LogLevel.Basic);
-                InstallGameDirFiles(extractedModEntry, ref gameData);
+                InstallGameDirFiles(extractedModEntry, ref gameData, oldFiles);
 
                 //ZIP: WMV Support
                 if (!isAddingWMV)
@@ -303,7 +345,7 @@ namespace SnakeBite
         }
 
         // i/o: _extr to GameDir
-        private static void InstallGameDirFiles(ModEntry modEntry, ref GameData gameData)
+        private static void InstallGameDirFiles(ModEntry modEntry, ref GameData gameData, List<string> oldFiles)
         {
             foreach (ModFileEntry fileEntry in modEntry.ModFileEntries)
             {
@@ -313,6 +355,15 @@ namespace SnakeBite
                     if (fileEntry.FilePath.Contains(ignoreFile))
                     {
                         skipFile = true;
+                    }
+                }
+
+                if (oldFiles.Count > 0)
+                {
+                    foreach (string oldFile in oldFiles)
+                    {
+                        if (oldFile == fileEntry.FilePath)
+                            skipFile = true;
                     }
                 }
                 /*
