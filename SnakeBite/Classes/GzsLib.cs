@@ -332,7 +332,7 @@ namespace SnakeBite.GzsTool
                 {
                     var qarFiles = new Dictionary<ulong, GameFile>();
                     var qarFile = new QarFile();
-                qarFile.Name = Path.GetFileName(qarPath);
+                    qarFile.Name = Path.GetFileName(qarPath);
                     qarFile.Read(archiveFile);
                     foreach (QarEntry entry in qarFile.Entries)
                     {

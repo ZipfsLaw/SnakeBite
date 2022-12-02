@@ -204,7 +204,7 @@ namespace SnakeBite
             for (int i = modEntry.ModQarEntries.Count - 1; i >= 0; i--)
             {
                 ModQarEntry qarEntry = modEntry.ModQarEntries[i];
-                if (!GzsLib.IsExtensionValidForArchive(qarEntry.FilePath, ".dat"))
+                if (!GzsLib.IsExtensionValidForArchive(qarEntry.FilePath, ".dat") && !qarEntry.FilePath.Contains("wmv")) //ZIP: WMV Support
                 {
                     Debug.LogLine($"[ValidateModEntries] Found invalid file entry {qarEntry.FilePath} for archive {qarEntry.SourceName}", Debug.LogLevel.Basic);
                     modEntry.ModQarEntries.RemoveAt(i);

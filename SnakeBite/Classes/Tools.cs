@@ -157,6 +157,7 @@ namespace SnakeBite
             "vo.evf",
             "vpc",
             "wem",
+            "wmv", //ZIP: WMV Support
             //"xml"
         };
 

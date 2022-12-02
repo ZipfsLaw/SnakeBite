@@ -1,4 +1,11 @@
 Changelog:
+0.9.2.2
+SnakeBite/MakeBite: 
+Updated GzsTool: Properly disposes of binarywriters. Adds hashing support for WMV extension.
+MakeBite: 
+Updated custom WMV Support: Automatically repacks any WMVs found in dir "\Assets\tpp\movie\Win". 
+Added blacklist to prevent vanilla WMVs from being replaced by mods ( Courtesy of CapLagRobin )
+
 0.9.2.1
 SnakeBite:
 Hotfix custom WMV support.

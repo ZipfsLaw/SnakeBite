@@ -26,7 +26,7 @@ namespace SnakeBite
             for (int i = gameData.GameQarEntries.Count-1; i >= 0; i--)
             {
                 ModQarEntry qarEntry = gameData.GameQarEntries[i];
-                if (!GzsLib.IsExtensionValidForArchive(qarEntry.FilePath, ".dat"))
+                if (!GzsLib.IsExtensionValidForArchive(qarEntry.FilePath, ".dat") && !qarEntry.FilePath.Contains("wmv")) //ZIP: WMV Support
                 {
                     Debug.LogLine($"[ValidateGameData] Found invalid file entry {qarEntry.FilePath} for archive {qarEntry.SourceName}", Debug.LogLevel.Basic);
                     gameData.GameQarEntries.RemoveAt(i);
@@ -520,16 +520,13 @@ namespace SnakeBite
                     //ZIP: Process all custom WMVs.
                     Debug.LogLine("[UpdateFoxfs] Checking installed mods", Debug.LogLevel.Debug);
                     HashSet<ulong> customWMVs = new HashSet<ulong>();
-                    foreach (ModEntry mod in mods)
-                    {
-                        foreach (ModWmvEntry entry in mod.ModWmvEntries)
-                        {
+                    foreach (ModEntry mod in mods){
+                        foreach (ModWmvEntry entry in mod.ModWmvEntries){
                             customWMVs.Add(entry.Hash);
                         }
                     }
-
                     if (customWMVs.Count > 0) //ZIP: If any custom WMVs are found, add them to safiles.
-                    {           
+                    {
                         Debug.LogLine("[UpdateFoxfs] Adding custom WMVs to foxfs.dat", Debug.LogLevel.Debug);
                         int wmvIndex = foxfsLine.IndexOf("	</safiles>"); // ZIP: Add custom wmvs to the end, for JP/EN compatibility
                         foxfsLine.RemoveAt(wmvIndex);
@@ -553,7 +550,6 @@ namespace SnakeBite
                     MessageBox.Show(string.Format("Setup cancelled: SnakeBite failed to extract foxfs from chunk0."), "foxfs check failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     Debug.LogLine("[UpdateFoxfs] Process failed: could not check foxfs.dat", Debug.LogLevel.Debug);
                     CleanupFolders("_chunk0");
-
                     return false;
                 }
 
